@@ -1,0 +1,789 @@
+import React, { useState } from 'react';
+import directStartImg from '../assets/arranque directo.png';
+import { ZoomPanViewer } from './ZoomPanViewer';
+import { KlixonModal } from './KlixonModal';
+import {
+  Zap,
+  Power,
+  Flame,
+  AlertTriangle,
+  ShieldAlert,
+  Volume2,
+  VolumeX,
+  Layers,
+} from 'lucide-react';
+import { UseDirectStartSimulatorReturn } from '../hooks/useDirectStartSimulator';
+
+interface DirectStartBenchViewerProps {
+  simulator: UseDirectStartSimulatorReturn;
+  rMarcha?: string;
+  rArranque?: string;
+  onSwitchToSchematics?: () => void;
+}
+
+export const DirectStartBenchViewer: React.FC<DirectStartBenchViewerProps> = ({
+  simulator,
+  onSwitchToSchematics,
+}) => {
+  const [isKlixonModalOpen, setIsKlixonModalOpen] = useState<boolean>(false);
+
+  const {
+    powerOn,
+    isBridging,
+    isMotorRunning,
+    klixonTripped,
+    bridgeDurationMs,
+    isAlarmActive,
+    motorRpm,
+    currentAmps,
+    handleTogglePower,
+    handleStartBridge,
+    handleEndBridge,
+    handleClickBridge,
+    handleResetKlixon,
+  } = simulator;
+
+  return (
+    <div className="w-full h-full bg-white dark:bg-[#0f1420] text-slate-900 dark:text-white rounded-xl border border-slate-200 dark:border-slate-800 p-3 shadow-sm flex flex-col justify-between select-none overflow-hidden">
+      {/* 1. Header Bar: BANCO DE TALLER + Subtitle */}
+      <div className="h-8 flex items-center justify-between pb-2 mb-2 border-b border-slate-200 dark:border-slate-800 shrink-0">
+        <div className="flex items-center gap-2 overflow-hidden">
+          <span className="font-mono text-tiny font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-700 shrink-0">
+            BANCO DE TALLER
+          </span>
+          <span className="text-tiny font-secondary text-slate-600 dark:text-slate-300 font-semibold truncate">
+            Simulador de Arranque Directo de Compresor
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {isMotorRunning && !klixonTripped && powerOn && (
+            <span className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+              <span>🔊 Compresor arrancado</span>
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => simulator.setSoundEnabled(!simulator.soundEnabled)}
+            className={`p-1 rounded text-tiny border transition-colors cursor-pointer ${
+              simulator.soundEnabled
+                ? 'bg-amber-400/20 text-amber-600 dark:text-amber-400 border-amber-400/40'
+                : 'bg-slate-200 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-700'
+            }`}
+            title={simulator.soundEnabled ? 'Silenciar audio del compresor' : 'Activar audio del compresor'}
+          >
+            {simulator.soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsKlixonModalOpen(true)}
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-tiny font-mono font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 transition-colors cursor-pointer"
+            title="Ver fotografía y despiece del Protector Térmico Klixon"
+          >
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>Ver Klixon</span>
+          </button>
+
+          {onSwitchToSchematics && (
+            <button
+              type="button"
+              onClick={onSwitchToSchematics}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-tiny font-mono font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+              title="Cambiar a la vista de esquemas técnicos"
+            >
+              <Layers className="w-3 h-3 text-amber-500" />
+              <span className="hidden sm:inline">Ver Esquemas</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 2. Main Center Display: ZoomPanViewer hosting the Workbench */}
+      <div className="relative w-full flex-1 min-h-[350px] flex flex-col items-center justify-center bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+        <ZoomPanViewer
+          className="w-full h-full min-h-[350px] rounded-lg bg-[#070a12] relative"
+          containerClassName="w-full h-full relative flex items-center justify-center"
+          initialZoom={1}
+          minZoom={0.8}
+          maxZoom={3.5}
+          toolbarPosition="top-right"
+          title="Banco de trabajo de arranque directo"
+        >
+            {/* Background Workbench Image from src/assets/arranque directo.png */}
+            <img
+              src={directStartImg}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/arranque-directo.png';
+              }}
+              alt="Arranque Directo Compresor (src/assets/arranque directo.png)"
+              className="w-full h-full object-contain pointer-events-none select-none"
+              draggable={false}
+            />
+
+            {/* Live Energized Wire Currents Glow SVG Layer */}
+            <svg
+              viewBox="0 0 1024 678"
+              className="absolute inset-0 w-full h-full pointer-events-none"
+              preserveAspectRatio="xMidYMid meet"
+            >
+              <defs>
+                <filter id="benchWireGlow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+                <filter id="benchSparkGlow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="4" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+                {/* 3D Blue Pushbutton gradients for active depressed state */}
+                <linearGradient id="benchBluePlungerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#1e3a8a" />
+                  <stop offset="25%" stopColor="#2563eb" />
+                  <stop offset="60%" stopColor="#3b82f6" />
+                  <stop offset="85%" stopColor="#2563eb" />
+                  <stop offset="100%" stopColor="#1d4ed8" />
+                </linearGradient>
+                <radialGradient id="benchBlueCapGrad" cx="45%" cy="35%" r="60%">
+                  <stop offset="0%" stopColor="#93c5fd" />
+                  <stop offset="35%" stopColor="#3b82f6" />
+                  <stop offset="85%" stopColor="#1d4ed8" />
+                  <stop offset="100%" stopColor="#1e3a8a" />
+                </radialGradient>
+              </defs>
+
+              {/* BOTÓN AZUL ACTIVO DEL PULSADOR (SE DEPRIME / BAJA FÍSICAMENTE AL PULSAR) */}
+              {isBridging && (
+                <g id="active-blue-button-depressed" className="pointer-events-none">
+                  {/* Máscara oscura que cubre la parte superior del botón que ha bajado (fondo del tablero) */}
+                  <rect x="836" y="66" width="44" height="15" fill="#1d242d" rx="1.5" />
+
+                  {/* Vástago del botón comprimido que se hunde hacia el collar metálico */}
+                  <rect
+                    x="842"
+                    y="81"
+                    width="31"
+                    height="18"
+                    rx="2"
+                    fill="url(#benchBluePlungerGrad)"
+                    stroke="#1e40af"
+                    strokeWidth="0.8"
+                  />
+
+                  {/* Sombrerete / pulsador azul hundido en contacto directo con la tuerca hexagonal */}
+                  <ellipse
+                    cx="857.5"
+                    cy="81"
+                    rx="19"
+                    ry="5.5"
+                    fill="url(#benchBlueCapGrad)"
+                    stroke="#1d4ed8"
+                    strokeWidth="0.8"
+                  />
+
+                  {/* Brillo especular superior del pulsador azul activo */}
+                  <ellipse cx="854" cy="80" rx="11" ry="1.8" fill="#ffffff" opacity="0.45" />
+                </g>
+              )}
+
+              {/* UNIÓN DE TERMINALES R Y S A TRAVÉS DEL INTERRUPTOR (Trazo del puente limpio y sin círculos semánticos) */}
+              {isBridging && powerOn && !klixonTripped && (
+                <g id="rs-bridge-energized-path">
+                  {/* TRAZADO DE LÍNEA DISCONTINUA A TRAVÉS DEL INTERRUPTOR: R (785,310) -> Interruptor (840-876,180) -> S (915,310) */}
+                  <path
+                    d="M 785 310 L 785 218 L 840 218 L 840 180 L 876 180 L 876 218 L 915 218 L 915 310"
+                    fill="none"
+                    stroke="#facc15"
+                    strokeWidth="4"
+                    strokeDasharray="7 4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    filter="url(#benchSparkGlow)"
+                    className="animate-pulse"
+                  />
+                  <path
+                    d="M 785 310 L 785 218 L 840 218 L 840 180 L 876 180 L 876 218 L 915 218 L 915 310"
+                    fill="none"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                    strokeDasharray="5 4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+
+                  {/* TRAZADO DE LÍNEA DISCONTINUA DIRECTA ENTRE TERMINALES R Y S (Puente directo complementario) */}
+                  <path
+                    d="M 785 310 Q 850 338 915 310"
+                    fill="none"
+                    stroke="#facc15"
+                    strokeWidth="3.5"
+                    strokeDasharray="6 3"
+                    strokeLinecap="round"
+                    filter="url(#benchSparkGlow)"
+                    className="animate-pulse"
+                  />
+                  <path
+                    d="M 785 310 Q 850 338 915 310"
+                    fill="none"
+                    stroke="#ffffff"
+                    strokeWidth="1.8"
+                    strokeDasharray="4 3"
+                    strokeLinecap="round"
+                  />
+                </g>
+              )}
+
+              {/* INDICADOR DE ACELERACIÓN DURANTE EL IMPULSO (isBridging activo) */}
+              {isBridging && powerOn && !klixonTripped && !isMotorRunning && (
+                <g id="rotorStartingAcceleration" transform="translate(495, 115)">
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="44"
+                    fill="#181204"
+                    fillOpacity="0.9"
+                    stroke="#f59e0b"
+                    strokeWidth="2"
+                    filter="drop-shadow(0 0 10px rgba(245,158,11,0.5))"
+                  />
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="40"
+                    fill="none"
+                    stroke="#f59e0b"
+                    strokeWidth="3"
+                    strokeDasharray="8 4"
+                    className="animate-spin"
+                    style={{ animationDuration: '1s' }}
+                  />
+                  <text
+                    x="0"
+                    y="0"
+                    fill="#fbbf24"
+                    fontSize="11"
+                    fontWeight="900"
+                    textAnchor="middle"
+                    fontFamily="monospace"
+                  >
+                    {motorRpm}
+                  </text>
+                  <text
+                    x="0"
+                    y="11"
+                    fill="#fef08a"
+                    fontSize="7"
+                    fontWeight="800"
+                    textAnchor="middle"
+                    fontFamily="monospace"
+                  >
+                    RPM...
+                  </text>
+                  <text
+                    x="0"
+                    y="22"
+                    fill="#ffffff"
+                    fontSize="6.5"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                    fontFamily="sans-serif"
+                  >
+                    MANTÉN PULSADO
+                  </text>
+                </g>
+              )}
+
+              {/* COMPRESOR EN RÉGIMEN NORMAL DE FUNCIONAMIENTO (VISUALIZACIÓN DE ALTO CONTRASTE Y ROTACIÓN NOMINAL) */}
+              {isMotorRunning && powerOn && !klixonTripped && (
+                <g id="compressorRunningRegimeVisuals" transform="translate(495, 115)">
+                  {/* 1. Ondas acústicas y mecánicas de bombeo y compresión continua */}
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="92"
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="1.8"
+                    strokeDasharray="8 6"
+                    opacity="0.35"
+                    className="animate-ping"
+                    style={{ animationDuration: '2.2s' }}
+                  />
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="68"
+                    fill="none"
+                    stroke="#34d399"
+                    strokeWidth="2"
+                    opacity="0.4"
+                    className="animate-pulse"
+                  />
+
+                  {/* 2. Fondo circular del tacómetro con alto contraste y bisel protector */}
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="46"
+                    fill="#03150e"
+                    fillOpacity="0.94"
+                    stroke="#059669"
+                    strokeWidth="2.2"
+                    filter="drop-shadow(0 0 14px rgba(16,185,129,0.55))"
+                  />
+
+                  {/* 3. Corona exterior dentada giratoria de flujo magnético (~2.850 RPM) */}
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="43"
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="3.2"
+                    strokeDasharray="6 3.5"
+                    className="animate-spin"
+                    style={{ animationDuration: '0.8s' }}
+                  />
+
+                  {/* 4. Anillo interior secundario contra-rotante de sincronismo */}
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="36"
+                    fill="none"
+                    stroke="#34d399"
+                    strokeWidth="1.2"
+                    strokeDasharray="14 7"
+                    className="animate-spin"
+                    style={{ animationDirection: 'reverse', animationDuration: '2.8s' }}
+                  />
+
+                  {/* 5. Rotor interior con 3 aspas de turbina en rotación continua */}
+                  <g className="animate-spin" style={{ animationDuration: '0.55s' }}>
+                    <path
+                      d="M 0 0 L -6 -24 A 26 26 0 0 1 6 -24 Z"
+                      fill="#10b981"
+                      fillOpacity="0.35"
+                    />
+                    <path
+                      d="M 0 0 L 25 -3 A 26 26 0 0 1 19 15 Z"
+                      fill="#10b981"
+                      fillOpacity="0.35"
+                    />
+                    <path
+                      d="M 0 0 L -18 16 A 26 26 0 0 1 -24 -2 Z"
+                      fill="#10b981"
+                      fillOpacity="0.35"
+                    />
+                  </g>
+
+                  {/* 6. Núcleo central digital protegido */}
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="25"
+                    fill="#022c22"
+                    fillOpacity="0.94"
+                    stroke="#34d399"
+                    strokeWidth="1.6"
+                  />
+
+                  {/* 7. Texto numérico de alta visibilidad: 2.850 RPM */}
+                  <text
+                    x="0"
+                    y="2"
+                    fill="#ffffff"
+                    fontSize="12.5"
+                    fontWeight="900"
+                    textAnchor="middle"
+                    fontFamily="monospace"
+                    letterSpacing="0.2"
+                    filter="drop-shadow(0 0 4px #10b981)"
+                  >
+                    2.850
+                  </text>
+                  <text
+                    x="0"
+                    y="14"
+                    fill="#6ee7b7"
+                    fontSize="7.5"
+                    fontWeight="900"
+                    textAnchor="middle"
+                    fontFamily="monospace"
+                    letterSpacing="0.8"
+                  >
+                    RPM
+                  </text>
+
+                  {/* 8. Placa / Cartela indicadora de régimen normal reubicada bajo el símbolo del compresor */}
+                  <g id="regimenNormalPlaqueUnderCompressor" transform="translate(0, 56)">
+                    <rect
+                      x="-125"
+                      y="-11"
+                      width="250"
+                      height="22"
+                      rx="6"
+                      fill="#022c22"
+                      fillOpacity="0.96"
+                      stroke="#10b981"
+                      strokeWidth="1.8"
+                      filter="drop-shadow(0 0 10px rgba(16,185,129,0.7))"
+                    />
+                    <circle cx="-108" cy="0" r="3" fill="#10b981" />
+                    <text
+                      x="7"
+                      y="4"
+                      fill="#ecfdf5"
+                      fontSize="9"
+                      fontWeight="900"
+                      textAnchor="middle"
+                      fontFamily="monospace"
+                      letterSpacing="0.4"
+                    >
+                      COMPRESOR EN RÉGIMEN NORMAL • 2.850 RPM
+                    </text>
+                  </g>
+                </g>
+              )}
+
+              {/* PANTALLA LCD DIGITAL DE LA PINZA AMPERIMÉTRICA */}
+              {/* Ajustada a la posición y dimensiones exactas del display físico de la pinza (x: 224, y: 494, w: 92, h: 57) */}
+              <g
+                id="clampMeterLcdDisplay"
+                transform="translate(224, 494)"
+                style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+              >
+                {/* Marco y bisel exterior de la pantalla LCD */}
+                <rect
+                  x="0"
+                  y="0"
+                  width="92"
+                  height="57"
+                  rx="3"
+                  fill="#0c120a"
+                  stroke="#1c2419"
+                  strokeWidth="1.2"
+                />
+                {/* Cristal LCD verde-grisáceo de fondo */}
+                <rect
+                  x="7"
+                  y="8"
+                  width="77"
+                  height="40"
+                  rx="2"
+                  fill="#bccab6"
+                  stroke="#788a74"
+                  strokeWidth="0.8"
+                />
+                {/* Textura sutil LCD */}
+                <rect
+                  x="7.5"
+                  y="8.5"
+                  width="76"
+                  height="39"
+                  fill="#cad9c4"
+                  fillOpacity="0.35"
+                />
+
+                {/* Modo AC ~ */}
+                <text
+                  x="12"
+                  y="18"
+                  fill="#1c2a19"
+                  fontSize="6.5"
+                  fontWeight="bold"
+                  fontFamily="monospace"
+                >
+                  AC ~
+                </text>
+                {/* AUTO */}
+                <text
+                  x="36"
+                  y="18"
+                  fill="#2c3c28"
+                  fontSize="5.5"
+                  fontWeight="bold"
+                  fontFamily="monospace"
+                >
+                  AUTO
+                </text>
+
+                {/* Lectura digital principal (Dígitos LCD de 7 segmentos) */}
+                <text
+                  x="64"
+                  y="40"
+                  fill="#0f1c0e"
+                  fontSize="22"
+                  fontWeight="900"
+                  textAnchor="end"
+                  fontFamily="monospace"
+                  letterSpacing="-1"
+                >
+                  {powerOn && !klixonTripped ? currentAmps.toFixed(2) : '0.00'}
+                </text>
+
+                {/* Unidad A */}
+                <text
+                  x="68"
+                  y="39"
+                  fill="#0f1c0e"
+                  fontSize="12.5"
+                  fontWeight="900"
+                  fontFamily="monospace"
+                >
+                  A
+                </text>
+              </g>
+
+              {/* ÁREA SEMÁNTICA E INTERACTIVA DEL PULSADOR DE ARRANQUE (REUBICADA VERTICALMENTE HACIA ABAJO SOBRE EL SOMBRERETE AZUL DEL INTERRUPTOR) */}
+              <g
+                id="switch-pulsador-hitbox"
+                style={{
+                  pointerEvents: 'auto',
+                  cursor:
+                    isMotorRunning && !isBridging
+                      ? 'default'
+                      : !powerOn || klixonTripped
+                      ? 'not-allowed'
+                      : 'pointer',
+                }}
+                onClick={handleClickBridge}
+                onMouseDown={handleStartBridge}
+                onMouseUp={handleEndBridge}
+                onMouseLeave={handleEndBridge}
+                onTouchStart={handleStartBridge}
+                onTouchEnd={handleEndBridge}
+                role="button"
+                tabIndex={0}
+                aria-label="Pulsador puente R-S de arranque"
+              >
+                {/* Rectángulo de sombreado semántico reubicado verticalmente hacia abajo, posicionado exactamente sobre el sombrerete azul */}
+                <rect
+                  id="switch-pulsador-semantic-box"
+                  x="834"
+                  y="67"
+                  width="47"
+                  height="35"
+                  rx="7"
+                  ry="7"
+                  fill={
+                    isAlarmActive
+                      ? 'rgba(244, 63, 94, 0.45)'
+                      : isBridging
+                      ? 'rgba(59, 130, 246, 0.50)'
+                      : isMotorRunning
+                      ? 'rgba(16, 185, 129, 0.08)'
+                      : 'rgba(59, 130, 246, 0.22)'
+                  }
+                  stroke={
+                    isAlarmActive
+                      ? '#f43f5e'
+                      : isBridging
+                      ? '#3b82f6'
+                      : isMotorRunning
+                      ? 'rgba(16, 185, 129, 0.35)'
+                      : '#3b82f6'
+                  }
+                  strokeWidth={isAlarmActive || isBridging ? '2.5' : '1.8'}
+                  className={isAlarmActive ? 'animate-bounce' : ''}
+                >
+                  <title>
+                    {isMotorRunning
+                      ? 'Compresor en marcha normal. El pulsador de arranque ha cumplido su función y queda inactivo.'
+                      : 'Pulsador de arranque (Puente R-S): Mantén presionado 0.3s para arrancar automáticamente'}
+                  </title>
+                </rect>
+
+                {/* Halo interactivo de guía cuando está energizado y listo para pulsar */}
+                {!isMotorRunning && powerOn && !klixonTripped && !isBridging && (
+                  <rect
+                    x="831"
+                    y="64"
+                    width="53"
+                    height="41"
+                    rx="9"
+                    ry="9"
+                    fill="none"
+                    stroke="#93c5fd"
+                    strokeWidth="1.2"
+                    strokeDasharray="4 3"
+                    opacity="0.8"
+                    className="animate-pulse"
+                  />
+                )}
+
+                {/* Zona de impacto táctil invisible ligeramente más amplia para interacción fluida */}
+                <rect
+                  x="824"
+                  y="57"
+                  width="67"
+                  height="55"
+                  fill="transparent"
+                  stroke="none"
+                />
+              </g>
+            </svg>
+
+            {isBridging && (
+              <div
+                className={`absolute pointer-events-none select-none z-30 flex items-center gap-2 px-3.5 py-1.5 rounded-full border-2 font-mono text-xs font-black backdrop-blur-md animate-fadeIn ${
+                  isAlarmActive
+                    ? 'bg-rose-950/95 border-rose-400 text-rose-100 shadow-[0_0_25px_rgba(244,63,94,0.9)] animate-bounce'
+                    : isMotorRunning
+                    ? 'bg-emerald-950/95 border-emerald-400 text-emerald-100 shadow-[0_0_25px_rgba(16,185,129,0.7)]'
+                    : 'bg-blue-950/95 border-blue-400 text-blue-100 shadow-[0_0_25px_rgba(59,130,246,0.7)]'
+                }`}
+                style={{ left: '50%', top: '3.5%', transform: 'translateX(-50%)' }}
+              >
+                <Zap className={`w-4 h-4 ${isAlarmActive ? 'text-rose-300 animate-spin' : isMotorRunning ? 'text-emerald-300' : 'text-blue-300 animate-bounce'}`} />
+                <span>
+                  {isAlarmActive
+                    ? `🚨 ¡ERROR (> 3s)! SUELTA EL PULSADOR (${(bridgeDurationMs / 1000).toFixed(1)}s)`
+                    : isMotorRunning
+                    ? `⚡ MOTOR ARRANCADO (${(bridgeDurationMs / 1000).toFixed(1)}s) • SUELTA EL BOTÓN`
+                    : `PULSADO: ${(bridgeDurationMs / 1000).toFixed(1)}s (mín. 0.3s) • ACELERANDO ROTOR...`}
+                </span>
+              </div>
+            )}
+
+            {/* 3. INTERACTIVE 230V MAINS SWITCH: REUBICADO JUNTO A LA ENTRADA L/N (Siguiendo la flecha izquierda) */}
+            <div
+              className="absolute pointer-events-auto cursor-pointer"
+              style={{
+                left: '18.2%',
+                top: '31.0%',
+                transform: 'translate(-50%, -50%)',
+              }}
+              onClick={handleTogglePower}
+              title={powerOn ? 'Red 230V Conectada • Clic para desconectar' : 'Red 230V Desconectada • Clic para conectar'}
+            >
+              <button
+                type="button"
+                className={`px-2.5 py-1 rounded-lg font-mono text-[10px] sm:text-[11px] font-black border transition-all shadow-lg flex items-center gap-1.5 cursor-pointer ${
+                  powerOn
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-300 ring-2 ring-emerald-500/50 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+                    : 'bg-slate-900/90 text-slate-300 border-slate-600 hover:bg-slate-800 ring-1 ring-slate-500/30'
+                }`}
+              >
+                <Power className={`w-3.5 h-3.5 ${powerOn ? 'text-white animate-pulse' : 'text-slate-400'}`} />
+                <span>{powerOn ? '230V ON' : '230V OFF'}</span>
+              </button>
+            </div>
+
+            {/* VENTANA DE ALARMA KLIXON: REUBICADA EN LA ZONA SUPERIOR MARCADA POR EL USUARIO */}
+            {klixonTripped && (
+              <div
+                className="absolute pointer-events-auto cursor-pointer z-30 flex flex-col items-center"
+                style={{
+                  left: '40.0%',
+                  top: '31.0%',
+                  transform: 'translate(-50%, -50%)',
+                }}
+                onClick={handleResetKlixon}
+                title="Klixon abierto por sobreintensidad o sobrecalentamiento • Clic para rearmar"
+              >
+                <div className="flex flex-col items-center bg-rose-950/95 text-white px-2.5 py-1.5 rounded-xl shadow-[0_0_25px_rgba(244,63,94,0.9)] border-2 border-rose-400 backdrop-blur-md animate-bounce">
+                  <div className="flex items-center gap-1 font-mono text-[9px] sm:text-[10px] font-black text-rose-200 whitespace-nowrap">
+                    <Flame className="w-3.5 h-3.5 text-yellow-300 fill-current animate-pulse" />
+                    <span>ALARMA KLIXON</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="mt-1 px-2.5 py-0.5 rounded-md bg-rose-600 hover:bg-rose-500 text-white font-mono text-[9px] font-extrabold shadow-md border border-rose-200 flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                  >
+                    <Power className="w-3 h-3 text-white" />
+                    <span>REARMAR KLIXON</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 4. ETIQUETA KLIXON INTERACTIVA (SOBRE LA IMAGEN DEL BANCO) */}
+            {/* Al pulsar sobre la etiqueta KLIXON de la imagen se muestra la ventana modal con klixon.png */}
+            {/* Dimensiones y curvatura adaptadas exactamente al marco de la etiqueta marrón */}
+            <div
+              id="klixon-hotspot-label"
+              className="absolute pointer-events-auto cursor-pointer select-none group z-20"
+              style={{
+                left: '40.04%',
+                top: '47.75%',
+                transform: 'translate(-50%, -50%)',
+                width: '8.4%',
+                height: '8.4%',
+              }}
+              onClick={() => setIsKlixonModalOpen(true)}
+              title="Protector Térmico Klixon: Clic para ver fotografía y despiece en ventana modal"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === ' ' || e.key === 'Enter') {
+                  e.preventDefault();
+                  setIsKlixonModalOpen(true);
+                }
+              }}
+            >
+              {/* Marco interactivo con idéntico alto, ancho y radio de curvatura que la etiqueta KLIXON */}
+              <div className={`w-full h-full rounded-[10px] border-2 transition-all flex flex-col items-center justify-center relative ${
+                klixonTripped
+                  ? 'border-rose-500 bg-rose-500/35 shadow-[0_0_24px_rgba(239,68,68,0.9)] animate-pulse'
+                  : 'border-amber-400/40 group-hover:border-amber-400 group-hover:bg-amber-400/20 group-hover:shadow-[0_0_18px_rgba(251,191,36,0.7)]'
+              }`}>
+                {/* Tooltip flotante al hacer hover o cuando ha saltado el Klixon */}
+                <div className={`absolute -top-7 transition-all pointer-events-none z-30 rounded-md px-2 py-0.5 text-[9px] font-mono font-black whitespace-nowrap shadow-2xl flex items-center gap-1 ${
+                  klixonTripped
+                    ? 'opacity-100 bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
+                    : 'opacity-0 group-hover:opacity-100 bg-slate-950/95 text-amber-300 border border-amber-400/80'
+                }`}>
+                  <ShieldAlert className={`w-3 h-3 ${klixonTripped ? 'text-rose-400' : 'text-amber-400'}`} />
+                  <span>{klixonTripped ? '🔥 ¡CLIC! KLIXON DISPARADO' : 'KLIXON • Clic para ver modal'}</span>
+                </div>
+              </div>
+            </div>
+          </ZoomPanViewer>
+
+        {/* FLOATING NOTIFICATION BANNER IF KLIXON TRIPPED */}
+        {klixonTripped && (
+          <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-40 bg-rose-700/95 border-2 border-white text-white px-3.5 py-1.5 rounded-xl shadow-[0_0_30px_#ef4444] animate-bounce flex items-center gap-2.5 pointer-events-auto max-w-[90%]">
+            <AlertTriangle className="w-5 h-5 text-amber-300 animate-pulse shrink-0" />
+            <div className="font-mono text-left">
+              <div className="text-[11px] sm:text-[12px] font-black tracking-wide leading-tight">
+                🔥 ¡CLIC! DISPARO DEL PROTECTOR TÉRMICO KLIXON
+              </div>
+              <div className="text-[9px] sm:text-[10px] text-rose-100 font-semibold leading-tight">
+                Circuito abierto a 0V tras absorción de rotor bloqueado.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleResetKlixon}
+              className="ml-1 px-2.5 py-1 rounded-md bg-white text-rose-900 hover:bg-rose-100 text-[10px] font-black font-mono shadow active:scale-95 cursor-pointer shrink-0"
+            >
+              Rearmar
+            </button>
+          </div>
+        )}
+
+        {/* FLOATING CRITICAL ALARM OVERLAY BANNER IF SWITCH IS HELD OVER 2.5-3 SECONDS */}
+        {isAlarmActive && (
+          <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-40 bg-rose-600/95 border-2 border-white text-white px-3.5 py-1.5 rounded-xl shadow-[0_0_30px_#ef4444] animate-bounce flex items-center gap-2.5 pointer-events-none max-w-[90%]">
+            <AlertTriangle className="w-5 h-5 text-amber-300 animate-pulse shrink-0" />
+            <div className="font-mono text-left">
+              <div className="text-[11px] sm:text-[12px] font-black tracking-wide leading-tight">
+                🚨 ¡ALARMA! PULSADOR BLOQUEADO (&gt; 3s)
+              </div>
+              <div className="text-[9px] sm:text-[10px] text-rose-100 font-semibold leading-tight">
+                ¡Peligro inminente de quemar la bobina auxiliar (S)! Suelta el pulsador inmediatamente.
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Ventana Modal de Detalle del Protector Térmico Klixon */}
+      <KlixonModal
+        isOpen={isKlixonModalOpen}
+        onClose={() => setIsKlixonModalOpen(false)}
+      />
+    </div>
+  );
+};
